@@ -1,14 +1,27 @@
+// script.js
 const text = document.getElementById("text");
 const amount = document.getElementById("amount");
 const addBtn = document.getElementById("add-btn");
 const list = document.getElementById("transaction-list");
 const filterBtns = document.querySelectorAll(".filter-btn");
+const searchInput = document.getElementById("search");
 
 const balanceEl = document.getElementById("balance");
 const incomeEl = document.getElementById("income");
 const expenseEl = document.getElementById("expense");
 
-let transactions = [];
+let transactions = JSON.parse(localStorage.getItem("transactions")) || [];
+let searchQuery = "";
+
+function saveAndRender() {
+  localStorage.setItem("transactions", JSON.stringify(transactions));
+  updateUI(getActiveFilter());
+}
+
+function getActiveFilter() {
+  const activeBtn = document.querySelector(".filter-btn.active");
+  return activeBtn ? activeBtn.dataset.type : "all";
+}
 
 function addTransaction(name, amt) {
   const transaction = {
@@ -18,20 +31,21 @@ function addTransaction(name, amt) {
     date: new Date().toISOString().split("T")[0],
   };
   transactions.push(transaction);
-  updateUI();
+  saveAndRender();
 }
 
 function deleteTransaction(id) {
   transactions = transactions.filter((t) => t.id !== id);
-  updateUI();
+  saveAndRender();
 }
 
 function updateUI(filter = "all") {
   list.innerHTML = "";
 
   const filtered = transactions.filter((t) => {
-    if (filter === "income") return t.amount > 0;
-    if (filter === "expense") return t.amount < 0;
+    if (filter === "income" && t.amount <= 0) return false;
+    if (filter === "expense" && t.amount >= 0) return false;
+    if (searchQuery && !t.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
@@ -41,13 +55,13 @@ function updateUI(filter = "all") {
     if (t.amount < 0) li.classList.add("expense");
 
     li.innerHTML = `
-      <div>
-        <strong>${t.name}</strong><br />
+      <div class="transaction-details">
+        <strong>${t.name}</strong>
         <span class="transaction-date">${t.date}</span>
       </div>
       <div class="transaction-right">
-        <span class="${t.amount < 0 ? "negative" : "positive"}">₹${Math.abs(t.amount)}</span>
-        <button class="delete-btn" onclick="deleteTransaction(${t.id})">&times;</button>
+        <span class="${t.amount < 0 ? "amount negative" : "amount positive"}">₹${Math.abs(t.amount)}</span>
+        <button class="delete-btn" onclick="deleteTransaction(${t.id})">Delete</button>
       </div>
     `;
     list.appendChild(li);
@@ -66,7 +80,8 @@ function updateSummary() {
   expenseEl.textContent = `₹${Math.abs(expense)}`;
 }
 
-addBtn.addEventListener("click", () => {
+addBtn.addEventListener("click", (e) => {
+  e.preventDefault();
   const name = text.value.trim();
   const amt = parseFloat(amount.value);
   if (!name || isNaN(amt) || amt === 0) {
@@ -80,11 +95,16 @@ addBtn.addEventListener("click", () => {
 
 filterBtns.forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelector(".filter-btn.active").classList.remove("active");
+    document.querySelector(".filter-btn.active")?.classList.remove("active");
     btn.classList.add("active");
     updateUI(btn.dataset.type);
   });
 });
 
-// Initial load
+// NEW: Search by description
+searchInput?.addEventListener("input", () => {
+  searchQuery = searchInput.value.trim();
+  updateUI(getActiveFilter());
+});
+
 updateUI();
